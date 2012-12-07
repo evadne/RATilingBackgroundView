@@ -81,7 +81,10 @@
 	[super didMoveToSuperview];
 	
 	[self reset];
-	[self setUpObservations];
+	
+	if (self.superview) {
+		[self setUpObservations];
+	}
 
 }
 
