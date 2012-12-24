@@ -94,46 +94,51 @@
 	
 	[super layoutSubviews];
 		
-	NSArray *tilingRects = [self tilingRects];
-	NSMutableArray *unusedVisibleTiles = [self.visibleTiles mutableCopy];
+	NSPointerArray *unusedVisibleTiles = [NSPointerArray weakObjectsPointerArray];
+	for (UIView *visibleTile in self.visibleTiles)
+		[unusedVisibleTiles addPointer:(void *)visibleTile];
 	
-	[tilingRects enumerateObjectsUsingBlock:^(NSValue *rectValue, NSUInteger idx, BOOL *stop) {
+	NSUInteger tileRectsCount = 0;
+	[self getPrimitiveTilingRects:NULL count:&tileRectsCount];
+	
+	CGRect * const tileRects = malloc(tileRectsCount * sizeof(CGRect));
+	[self getPrimitiveTilingRects:tileRects count:&tileRectsCount];
+	
+	NSUInteger const unusedVisibleTilesCount = [unusedVisibleTiles count];
+	
+	for (NSUInteger tileRectIndex = 0; tileRectIndex < tileRectsCount; tileRectIndex++) {
+	
+		CGRect rect = tileRects[tileRectIndex];
+		UIView *tile = nil;
 		
-		CGRect rect = [rectValue CGRectValue];
-		
-		UIView *tile = [unusedVisibleTiles count] ?
-			[unusedVisibleTiles objectAtIndex:0] :
-			nil;
-		
-		if (tile) {
-			[unusedVisibleTiles removeObject:tile];
+		if (!!unusedVisibleTilesCount && (tileRectIndex < (unusedVisibleTilesCount - 1))) {
+			
+			tile = (UIView *)[unusedVisibleTiles pointerAtIndex:tileRectIndex];
+			[unusedVisibleTiles replacePointerAtIndex:tileRectIndex withPointer:NULL];
+						
 		} else {
+			
 			tile = [self newTile];
 			[self addSubview:tile];
 			[self.visibleTiles addObject:tile];
+			
 		}
-		
+				
 		tile.frame = rect;
 		
-		NSCParameterAssert(![unusedVisibleTiles containsObject:tile]);
-		NSCParameterAssert([self.visibleTiles containsObject:tile]);
-		NSCParameterAssert(![self.dequeuedTiles containsObject:tile]);
-		NSCParameterAssert([self.subviews containsObject:tile]);
-		
-	}];
+	}
 	
-	[self.visibleTiles removeObjectsInArray:unusedVisibleTiles];
-	[self.dequeuedTiles addObjectsFromArray:unusedVisibleTiles];
+	free(tileRects);
 	
-	for (UIView *unusedVisibleTile in unusedVisibleTiles) {
+	[unusedVisibleTiles compact];
+	NSArray *leftoverTiles = [unusedVisibleTiles allObjects];
+	
+	[self.visibleTiles removeObjectsInArray:leftoverTiles];
+	[self.dequeuedTiles addObjectsFromArray:leftoverTiles];
+	
+	for (UIView *unusedVisibleTile in leftoverTiles) {
 		[unusedVisibleTile removeFromSuperview];
 	}
-	
-	for (UIView *dequeuedTile in self.dequeuedTiles) {
-		NSCParameterAssert(![self.visibleTiles containsObject:dequeuedTile]);
-	}
-	
-	NSCParameterAssert([[NSSet setWithArray:self.subviews] isEqualToSet:[NSSet setWithArray:self.visibleTiles]]);
 	
 }
 
@@ -155,40 +160,49 @@
 
 }
 
-- (NSArray *) tilingRects {
-	
+- (void) getPrimitiveTilingRects:(CGRect *)outRects count:(NSUInteger *)outCount {
+
+	NSCParameterAssert(outCount);
+
 	CGSize tileSize = [self tileSize];
 	CGSize boundsSize = (CGSize){
 		.width = CGRectGetWidth(self.bounds) + ABS(self.offset.x),
 		.height = CGRectGetHeight(self.bounds) + ABS(self.offset.y)
 	};
+	
+	CGFloat fromX = self.offset.x;
+	CGFloat toX = fromX + boundsSize.width;
+	CGFloat stepX = tileSize.width;
+	CGFloat fromY = self.offset.y;
+	CGFloat toY = fromY + boundsSize.height;
+	CGFloat stepY = tileSize.height;
+	
+	NSUInteger numberOfTiles =
+		(NSUInteger)ceilf((toX - fromX) / stepX) *
+		(NSUInteger)ceilf((toY - fromY) / stepY);
+	
+	if (outCount) {
+		*outCount = numberOfTiles;
+	}
+
+	if (!outRects)
+		return;
+
+	NSUInteger rectIndex = 0;
+	
+	for (CGFloat offsetX = fromX; offsetX < toX; offsetX += stepX)
+	for (CGFloat offsetY = fromY; offsetY < toY; offsetY += stepY) {
 		
-	NSUInteger numberOfTiles = ceilf(boundsSize.width / tileSize.width) *
-		ceilf(boundsSize.height / tileSize.height);
-		
-	if (!numberOfTiles)
-		return @[];
-	
-	NSMutableArray *tileRects = [NSMutableArray arrayWithCapacity:numberOfTiles];
-	
-	for (CGFloat offsetX = self.offset.x; offsetX < boundsSize.width; offsetX += tileSize.width) {
-	
-		for (CGFloat offsetY = self.offset.y; offsetY < boundsSize.height; offsetY += tileSize.height) {
+		outRects[rectIndex] = (CGRect){
+			.origin.x = offsetX,
+			.origin.y = offsetY,
+			.size = tileSize
+		};
 			
-			CGRect rect = (CGRect){
-				.origin.x = offsetX,
-				.origin.y = offsetY,
-				.size = tileSize
-			};
-			
-			[tileRects addObject:[NSValue valueWithCGRect:rect]];
-		
-		}
+		rectIndex++;
 	
 	}
 	
-	return tileRects;
-
 }
 
 - (UIView *) newTile {
