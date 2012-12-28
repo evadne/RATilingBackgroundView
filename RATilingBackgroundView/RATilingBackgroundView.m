@@ -102,6 +102,8 @@
 	[self getPrimitiveTilingRects:NULL count:&tileRectsCount];
 	
 	CGRect * const tileRects = malloc(tileRectsCount * sizeof(CGRect));
+	memset(tileRects, 0, tileRectsCount * sizeof(CGRect));
+	
 	[self getPrimitiveTilingRects:tileRects count:&tileRectsCount];
 	
 	NSUInteger const unusedVisibleTilesCount = [unusedVisibleTiles count];
