@@ -113,7 +113,7 @@
 		CGRect rect = tileRects[tileRectIndex];
 		UIView *tile = nil;
 		
-		if (!!unusedVisibleTilesCount && (tileRectIndex < (unusedVisibleTilesCount - 1))) {
+		if (!!unusedVisibleTilesCount && (tileRectIndex <= (unusedVisibleTilesCount - 1))) {
 			
 			tile = (UIView *)[unusedVisibleTiles pointerAtIndex:tileRectIndex];
 			[unusedVisibleTiles replacePointerAtIndex:tileRectIndex withPointer:NULL];
@@ -131,8 +131,6 @@
 	}
 	
 	free(tileRects);
-	
-	[unusedVisibleTiles compact];
 	NSArray *leftoverTiles = [unusedVisibleTiles allObjects];
 	
 	[self.visibleTiles removeObjectsInArray:leftoverTiles];
@@ -165,23 +163,23 @@
 - (void) getPrimitiveTilingRects:(CGRect *)outRects count:(NSUInteger *)outCount {
 
 	NSCParameterAssert(outCount);
-
-	CGSize tileSize = [self tileSize];
-	CGSize boundsSize = (CGSize){
-		.width = CGRectGetWidth(self.bounds) + ABS(self.offset.x),
-		.height = CGRectGetHeight(self.bounds) + ABS(self.offset.y)
+	
+	CGSize const tileSize = [self tileSize];
+	CGSize const boundsSize = (CGSize){
+		.width = CGRectGetWidth(self.bounds),
+		.height = CGRectGetHeight(self.bounds)
 	};
 	
-	CGFloat fromX = self.offset.x;
-	CGFloat toX = fromX + boundsSize.width;
-	CGFloat stepX = tileSize.width;
-	CGFloat fromY = self.offset.y;
-	CGFloat toY = fromY + boundsSize.height;
-	CGFloat stepY = tileSize.height;
+	CGFloat const stepX = tileSize.width;
+	CGFloat const fromX = fmodf(self.offset.x, stepX);
+	CGFloat const toX = boundsSize.width;
+	CGFloat const stepY = tileSize.height;
+	CGFloat const fromY = fmodf(self.offset.y, stepY);
+	CGFloat const toY = boundsSize.height;
 	
-	NSUInteger numberOfTiles =
-		(NSUInteger)ceilf((toX - fromX) / stepX) *
-		(NSUInteger)ceilf((toY - fromY) / stepY);
+	NSUInteger const numberOfTilesX = (NSUInteger)(ceilf(toX / stepX) - floorf(fromX / stepX));
+	NSUInteger const numberOfTilesY = (NSUInteger)(ceilf(toY / stepY) - floorf(fromY / stepY));
+	NSUInteger const numberOfTiles = numberOfTilesX * numberOfTilesY;
 	
 	if (outCount) {
 		*outCount = numberOfTiles;
@@ -189,18 +187,19 @@
 
 	if (!outRects)
 		return;
-
-	NSUInteger rectIndex = 0;
 	
-	for (CGFloat offsetX = fromX; offsetX < toX; offsetX += stepX)
-	for (CGFloat offsetY = fromY; offsetY < toY; offsetY += stepY) {
+	NSUInteger rectIndex = 0;
+	for (NSUInteger indexX = 0; indexX < numberOfTilesX; indexX++)
+	for (NSUInteger indexY = 0; indexY < numberOfTilesY; indexY++) {
+		
+		NSCParameterAssert(rectIndex < numberOfTiles);
 		
 		outRects[rectIndex] = (CGRect){
-			.origin.x = offsetX,
-			.origin.y = offsetY,
+			.origin.x = fromX + indexX * stepX,
+			.origin.y = fromY + indexY * stepY,
 			.size = tileSize
 		};
-			
+		
 		rectIndex++;
 	
 	}
