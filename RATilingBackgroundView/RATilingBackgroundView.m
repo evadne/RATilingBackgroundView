@@ -267,6 +267,8 @@
 	
 	[target addObserver:self forKeyPath:@"bounds" options:NSKeyValueObservingOptionInitial|NSKeyValueObservingOptionOld|NSKeyValueObservingOptionNew context:(void *)self];
 
+	[target addObserver:self forKeyPath:@"frame" options:NSKeyValueObservingOptionInitial|NSKeyValueObservingOptionOld|NSKeyValueObservingOptionNew context:(void *)self];
+	
 }
 
 - (void) tearDownObservations {
@@ -281,6 +283,7 @@
 	}
 	
 	[target removeObserver:self forKeyPath:@"bounds" context:(void *)self];
+	[target removeObserver:self forKeyPath:@"frame" context:(void *)self];
 
 }
 
@@ -309,7 +312,7 @@
 					
 			};
 		
-		} else if ([keyPath isEqualToString:@"bounds"]) {
+		} else {
 		
 			self.frame = self.superview.bounds;
 		
